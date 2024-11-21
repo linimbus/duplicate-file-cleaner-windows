@@ -22,9 +22,8 @@ func MoveAction(from walk.Form, activeFunc func(isNew bool), cancelFunc func()) 
 		AssignTo:      &dlg,
 		Title:         "Move Options",
 		Icon:          walk.IconInformation(),
-		MinSize:       Size{Width: 310, Height: 150},
-		Size:          Size{Width: 310, Height: 150},
-		MaxSize:       Size{Width: 450, Height: 210},
+		MinSize:       Size{Width: 450, Height: 150},
+		Size:          Size{Width: 450, Height: 150},
 		DefaultButton: &acceptPB,
 		CancelButton:  &cancelPB,
 		Layout:        VBox{},
@@ -54,7 +53,7 @@ func MoveAction(from walk.Form, activeFunc func(isNew bool), cancelFunc func()) 
 									return
 								}
 							}
-							SearchDirSave(dir)
+							DestinationDirDirSave(dir)
 						},
 					},
 					PushButton{
@@ -74,7 +73,7 @@ func MoveAction(from walk.Form, activeFunc func(isNew bool), cancelFunc func()) 
 							if exist {
 								logs.Info("select %s as destination directory", dlgDir.FilePath)
 								destinationDir.SetText(dlgDir.FilePath)
-								SearchDirSave(dlgDir.FilePath)
+								DestinationDirDirSave(dlgDir.FilePath)
 							}
 						},
 					},
@@ -109,6 +108,10 @@ func MoveAction(from walk.Form, activeFunc func(isNew bool), cancelFunc func()) 
 						AssignTo: &acceptPB,
 						Text:     "OK",
 						OnClicked: func() {
+							if ConfigGet().DestinationDir == "" {
+								ErrorBoxAction(mainWindow, "The move to destination directory is empty")
+								return
+							}
 							dlg.Accept()
 							go activeFunc(newerCheck.Checked())
 						},

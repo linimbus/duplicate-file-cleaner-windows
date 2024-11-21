@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -113,6 +114,68 @@ func init() {
 	fileDupTable.items = make([]*FileItem, 0)
 }
 
+func MoveFileActive(isNew bool) {
+	lt := fileDupTable
+
+	outputDir := ConfigGet().DestinationDir
+
+	lt.Lock()
+	defer lt.Unlock()
+
+	total := len(lt.items)
+	if total == 0 {
+		return
+	}
+
+	stat, err := os.Stat(outputDir)
+	if err != nil {
+		if err == os.ErrNotExist {
+			if err = os.MkdirAll(outputDir, 0664); err != nil {
+				ErrorBoxAction(mainWindow, fmt.Sprintf("Create destination directory fail, %s", err.Error()))
+				return
+			}
+		} else {
+			ErrorBoxAction(mainWindow, fmt.Sprintf("Access destination directory fail, %s", err.Error()))
+			return
+		}
+	}
+
+	if !stat.IsDir() {
+		ErrorBoxAction(mainWindow, "The destination directory is not directory")
+		return
+	}
+
+	var moveFile string
+	for i := 0; i < total; i++ {
+		item := lt.items[0]
+		if isNew {
+			if item.FileTime.Compare(item.MatchTime) > 0 {
+				moveFile = item.File
+			} else {
+				moveFile = item.MatchFile
+			}
+		} else {
+			if item.FileTime.Compare(item.MatchTime) < 0 {
+				moveFile = item.File
+			} else {
+				moveFile = item.MatchFile
+			}
+		}
+		err = os.Rename(moveFile,
+			filepath.Join(outputDir,
+				fmt.Sprintf("%s%s", time.Now().Format("2006-01-02T15-04-05.000000"), filepath.Ext(moveFile))))
+		if err != nil {
+			logs.Error(err.Error())
+		}
+
+		lt.items = lt.items[1:]
+		lt.PublishRowsReset()
+		lt.Sort(lt.sortColumn, lt.sortOrder)
+
+		ProcessUpdate(i * 1000 / total)
+	}
+}
+
 func DeleteFileActive(isNew bool) {
 	lt := fileDupTable
 
@@ -124,20 +187,27 @@ func DeleteFileActive(isNew bool) {
 		return
 	}
 
+	var delFile string
+
 	for i := 0; i < total; i++ {
 		item := lt.items[0]
 		if isNew {
 			if item.FileTime.Compare(item.MatchTime) > 0 {
-				os.Remove(item.File)
+				delFile = item.File
 			} else {
-				os.Remove(item.MatchFile)
+				delFile = item.MatchFile
 			}
 		} else {
 			if item.FileTime.Compare(item.MatchTime) < 0 {
-				os.Remove(item.File)
+				delFile = item.File
 			} else {
-				os.Remove(item.MatchFile)
+				delFile = item.MatchFile
 			}
+		}
+
+		err := os.Remove(delFile)
+		if err != nil {
+			logs.Error(err.Error())
 		}
 
 		lt.items = lt.items[1:]
@@ -192,8 +262,15 @@ func SearchFileActive() {
 		} else {
 			matchFile, b := fileHmacList[hmac]
 			if b {
-				logs.Info("find the duplicate file, %s <-> %s", file, matchFile)
-				lt.items = append(lt.items, &FileItem{Index: i, File: file.file, FileTime: file.timestamp, MatchFile: matchFile.file, MatchTime: matchFile.timestamp, HMAC: hmac, Status: STATUS_DONE})
+				logs.Info("find the duplicate file, %s <-> %s", file.file, matchFile.file)
+				lt.items = append(lt.items, &FileItem{
+					Index:     i,
+					File:      file.file,
+					FileTime:  file.timestamp,
+					MatchFile: matchFile.file,
+					MatchTime: matchFile.timestamp,
+					HMAC:      hmac,
+					Status:    STATUS_DONE})
 				i++
 			} else {
 				fileHmacList[hmac] = file

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
 )
@@ -8,6 +10,8 @@ import (
 var search, delete, move, cancel *walk.PushButton
 
 func ButtonEnable() {
+	ProcessUpdate(1000)
+	time.Sleep(time.Millisecond * 500)
 	search.SetEnabled(true)
 	delete.SetEnabled(true)
 	move.SetEnabled(true)
@@ -54,7 +58,7 @@ func ActiveWidget() []Widget {
 			OnClicked: func() {
 				ButtonDisable()
 				MoveAction(mainWindow, func(isNew bool) {
-					// MoveAction(isNew)
+					MoveFileActive(isNew)
 					ButtonEnable()
 				}, func() {
 					ButtonEnable()
@@ -62,6 +66,7 @@ func ActiveWidget() []Widget {
 
 			},
 		},
+		HSpacer{},
 		PushButton{
 			AssignTo: &cancel,
 			Text:     "Cancel",
@@ -69,6 +74,5 @@ func ActiveWidget() []Widget {
 				CloseWindows()
 			},
 		},
-		HSpacer{},
 	}
 }
